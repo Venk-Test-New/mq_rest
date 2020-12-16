@@ -1,0 +1,12 @@
+{
+  "headers": {
+    "messageGroupId": "OptionalHeaderToGroupMessagesForFIFOQueues",
+    "deliveryDelay": 20000,
+    "lockId": "110e8300-e32b-41d4-a716-664400445500"
+  },
+  "properties": {
+    "userDefinedHeader": "User defined stuff",
+    "anotherUserDefinedHeader": "Random stuff"
+  },
+  "body": "This is a message payload"
+}

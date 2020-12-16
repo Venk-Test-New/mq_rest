@@ -1,0 +1,36 @@
+{
+  "$schema": "http://json-schema.org/draft-03/schema#",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "properties": {
+      "headers": {
+        "type": "object",
+        "required": true,
+        "properties": {
+          "messageId": {
+            "type": "string",
+            "required": true
+          },
+          "lockId": {
+            "type": "string",
+            "required": true
+          },
+          "deliveryDelay": {
+            "type": "integer",
+            "range": "0-900000",
+            "required": false
+          }
+        }
+      },
+      "properties": {
+        "type": "object",
+        "required": false
+      },
+      "body": {
+        "type": "string",
+        "required": true
+      }
+    }
+  }
+}

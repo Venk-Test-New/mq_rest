@@ -1,0 +1,289 @@
+#%RAML 1.0
+title: Courier Messaging API
+baseUri: https://mq-${REGION_ID}.anypoint.mulesoft.com/api/v1
+version: v1
+protocols: [ HTTP, HTTPS ]
+
+securitySchemes:
+  oauth_2_0: !include examples/oauth_2_0.yml
+
+documentation:
+  - title: Introduction
+    content: !include docs/doc-intro.md
+
+  - title: The Message
+    content: !include docs/doc-message.md
+
+#  - title: Moving single messages
+#    content: !include docs/doc-single.md
+
+#  - title: Batch processing
+#    content: !include docs/doc-batch.md
+
+schemas:
+  receiveBatchResponse: !include schemas/receiveBatchResponse.json
+  send: !include schemas/send.json
+  sendBatch: !include schemas/sendBatch.json
+  sendResponse: !include schemas/sendResponse.json
+  sendBatchResponse: !include schemas/sendBatchResponse.json
+  ack: !include schemas/ack.json
+  ackNackResponse: !include schemas/ackNackResponse.json
+  ackNackBatch: !include schemas/ackNackBatch.json
+  ackNackBatchResponse: !include schemas/ackNackBatchResponse.json
+  modifyTtlBatch: !include schemas/modifyTtlBatch.json
+  modifyTtlBatchResponse: !include schemas/modifyTtlBatchResponse.json
+  modifyTtl: !include schemas/modifyTtl.json
+  modifyTtlResponse: !include schemas/modifyTtlResponse.json
+
+traits:
+  destination: !include traits/destination.raml # Destinations may not be found or allowed
+  courierRequest: !include traits/courierRequest.raml # Courier requests may not be valid, the quote could be exceeded or the service could not be available
+
+securedBy: [oauth_2_0,null]
+/organizations:
+  /{organizationId}:
+    /environments:
+      /{environmentId}:
+        /destinations:
+          /{destinationId}: # /destinations/{destinationId}
+            uriParameters:
+              destinationId:
+                description: |
+                  Identifier of a destination.
+                example: myDestination
+                displayName: Destination ID
+                required: true
+                type: string
+                minLength: 1
+                maxLength: 127
+
+            /messages: # /destinations/{destinationId}/messages
+              get:
+                is: [ destination, courierRequest ]
+                description: |
+                  Requests messages from the destination
+                queryParameters:
+                  pollingTime:
+                    description: |
+                      Maximum time in milliseconds to wait for the expected message or messages.
+                    example: 5000
+                    displayName: Polling time
+                    required: false
+                    type: integer
+                    default: 10000
+                    minimum: 0
+                    maximum: 20000
+                  batchSize:
+                    description: Maximum number of messages to receive in a single call. When set as 1, the response is an array containing only one element.
+                    example: 5
+                    displayName: Batch size
+                    required: false
+                    type: integer
+                    default: 1
+                    minimum: 1
+                    maximum: 10
+                  lockTtl:
+                    displayName: Lock Time To Live
+                    description: |
+                      Defines the time to live of the created locks in milliseconds.
+                    example: 120000
+                    required: false
+                    type: integer
+                    default: 120000 # 2 minutes
+                    minimum: 0
+                    maximum: 86400000  # 1 day
+                responses:
+                  200:
+                    description: |
+                      OK, the message or messages has been fetched correctly.
+                    body:
+                      application/json:
+                        example: !include examples/receiveBatchResponse.json
+                        schema: receiveBatchResponse
+                  204:
+                    description: |
+                      There are no messages ready to be fetched.
+
+              put:
+                is: [ destination, courierRequest ]
+                description: |
+                  Publishes a batch of messages to the destination.
+                body:
+                  application/json:
+                    example: !include examples/sendBatch.json
+                    schema: sendBatch
+                responses:
+                  200:
+                    body:
+                      application/json:
+                        example: !include examples/sendBatchResponse.json
+                        schema: sendBatchResponse
+                    description: |
+                      Batch send delivered correctly. Find return status of each of the operations in a status header on each part.
+                  413:
+                    body:
+                      application/json:
+                        example: !include examples/requestBatchEntityTooLarge.json
+                        schema: sendBatchResponse
+                    description:
+                      Request size too large. Returns a client error code, failure status, and error message.
+
+              delete:
+                is: [ destination, courierRequest ]
+                description: |
+                  Acknowledge a batch of messages
+                body:
+                  application/json:
+                    example: !include examples/ackNackBatch.json
+                    schema: ackNackBatch
+                responses:
+                  200:
+                    body:
+                      application/json:
+                        example: !include examples/ackNackBatchResponse.json
+                        schema: ackNackBatchResponse
+                    description: |
+                      Performs a negative acknowledge batch sent correctly. Find return status of each of the operations in a status header on each part.
+
+              /locks: # /destinations/{destinationId}/messages/locks
+                patch:
+                  is: [ destination, courierRequest ]
+                  description: |
+                    Modifies the lock TTL of a batch of messages.
+                  body:
+                    application/json:
+                      example: !include examples/modifyTtlBatch.json
+                      schema: modifyTtlBatch
+                  responses:
+                    200:
+                      body:
+                        application/json:
+                          example: !include examples/modifyTtlBatchResponse.json
+                          schema: modifyTtlBatchResponse
+
+                delete:
+                  is: [ destination, courierRequest ]
+                  description: |
+                    Performs a batch negative acknowledge of messages. These are available again for this or other consumers.
+                  body:
+                    application/json:
+                      example: !include examples/ackNackBatch.json
+                      schema: ackNackBatch
+                  responses:
+                    200:
+                      description: |
+                        The operation has been successfully completed.
+                      body:
+                        application/json:
+                          example: !include examples/ackNackBatchResponse.json
+                          schema: ackNackBatchResponse
+
+              /{messageId}: # /destinations/{destinationId}/messages/{messageId}
+                uriParameters:
+                  messageId:
+                    displayName: MessageId ID
+                    description: |
+                      Unique identifier for the message
+                    example: my-message-id
+                    required: true
+                    type: string
+                    minLength: 1
+
+                put:
+                  is: [ destination, courierRequest ]
+                  description: |
+                    Sends the message to the specified destination.
+                  body:
+                    application/json:
+                      example: !include examples/send.json
+                  responses:
+                    201:
+                      description: |
+                        The message has been correctly sent to the destination.
+                      body:
+                        application/json:
+                          example: !include examples/sendResponse.json
+                          schema: sendResponse
+                    413:
+                      body:
+                        application/json:
+                          example: !include examples/requestEntityTooLarge.json
+                          schema: sendResponse
+                      description:
+                        Request size too large. Returns a client error code, failure status, and error message.
+
+                delete:
+                  is: [ destination, courierRequest ]
+                  description: |
+                    Performs an acknowledge of the message, effectively deleting it from the destination.
+                  body:
+                    application/json:
+                      example: !include examples/ack.json
+                      schema: ack
+                  responses:
+                    200:
+                      description: |
+                        The operation has been successfully completed.
+                      body:
+                        application/json:
+                          example: !include examples/ackNackResponse.json
+                          schema: ackNackResponse
+
+                /locks: # /destinations/{destinationId}/messages/{messageId}/locks
+                  /{lockId}: # /destinations/{destinationId}/messages/{messageId}/locks/{lockid}
+                    uriParameters:
+                      lockId:
+                        description: |
+                          Identificator of a lock.
+                        example: the-given-lock-id
+                        displayName: Lock ID
+                        required: true
+                        type: string
+                        minLength: 1
+
+                    patch:
+                      is: [ destination, courierRequest ]
+                      description: |
+                        Modifies the lock TTL. Typically occurs when the default TTL is not long enough to perform a particular operation.
+                      body:
+                        application/json:
+                          example: !include examples/modifyTtl.json
+                          schema: modifyTtl
+                      responses:
+                        200:
+                          description: |
+                            The operation has been successfully completed.
+                          body:
+                            application/json:
+                              example: !include examples/modifyTtlResponse.json
+                              schema: modifyTtlResponse
+
+                    delete:
+                      is: [ destination, courierRequest ]
+                      description: |
+                        Performs a negative acknowledge of the message. The message is available again for this or other consumers.
+                      responses:
+                        200:
+                          description: |
+                            The operation has been successfully completed.
+                          body:
+                            application/json:
+                              example: !include examples/ackNackResponse.json
+                              schema: ackNackResponse
+
+/authorize:
+  displayName: Client credentials Token URL
+  post:
+    description: |
+              Obtains an access token using client credentials of the OAuth grant type.
+    body:
+      application/x-www-form-urlencoded:
+    responses:
+      200:
+        body:
+          application/json:
+      401:
+        body:
+          application/json:
+
+
